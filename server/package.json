@@ -1,0 +1,11 @@
+{
+  "name": "oarena-server",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  }
+}

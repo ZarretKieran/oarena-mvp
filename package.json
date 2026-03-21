@@ -1,0 +1,5 @@
+{
+  "name": "oarena-mvp",
+  "private": true,
+  "workspaces": ["server", "client", "shared"]
+}

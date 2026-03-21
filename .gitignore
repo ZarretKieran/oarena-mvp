@@ -1,0 +1,6 @@
+node_modules/
+dist/
+oarena.db
+oarena.db-wal
+oarena.db-shm
+.env
