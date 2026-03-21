@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json ./
 COPY server/package.json server/
 COPY client/package.json client/
-COPY shared/package.json shared/ 2>/dev/null || true
+COPY shared/package.json shared/
 RUN bun install
 
 # Copy source
