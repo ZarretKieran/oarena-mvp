@@ -24,15 +24,39 @@ app.get('/api/health', (c) => c.json({ ok: true }));
 
 // Serve static client files in production
 const clientDist = join(import.meta.dir, '..', 'client', 'dist');
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+function getMimeType(path: string): string {
+  const ext = path.substring(path.lastIndexOf('.'));
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
 if (existsSync(clientDist)) {
   app.get('*', async (c) => {
     const path = c.req.path === '/' ? '/index.html' : c.req.path;
-    const file = Bun.file(join(clientDist, path));
+    const filePath = join(clientDist, path);
+    const file = Bun.file(filePath);
     if (await file.exists()) {
-      return new Response(file);
+      return new Response(file, {
+        headers: { 'Content-Type': getMimeType(path) },
+      });
     }
     // SPA fallback
-    return new Response(Bun.file(join(clientDist, 'index.html')));
+    return new Response(Bun.file(join(clientDist, 'index.html')), {
+      headers: { 'Content-Type': 'text/html' },
+    });
   });
 }
 
