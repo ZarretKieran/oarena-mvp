@@ -18,7 +18,8 @@ export type ParticipantStatus =
   | 'ready'
   | 'racing'
   | 'finished'
-  | 'disqualified';
+  | 'disqualified'
+  | 'dnf';
 
 export interface RaceConfig {
   readonly format: RaceFormat;
@@ -93,7 +94,17 @@ export interface WsJoinRoom {
   readonly race_id: string;
 }
 
-export type ClientMessage = WsWarmupConfirm | WsReady | WsRaceData | WsJoinRoom;
+export interface WsExitRace {
+  readonly type: 'exit_race';
+  readonly race_id: string;
+}
+
+export interface WsForceFinish {
+  readonly type: 'force_finish';
+  readonly race_id: string;
+}
+
+export type ClientMessage = WsWarmupConfirm | WsReady | WsRaceData | WsJoinRoom | WsExitRace | WsForceFinish;
 
 // Server → Client
 export interface WsRaceState {
@@ -102,6 +113,9 @@ export interface WsRaceState {
   readonly state: RaceState;
   readonly countdown?: number;
   readonly participants: ReadonlyArray<Participant>;
+  readonly format?: RaceFormat;
+  readonly target_value?: number;
+  readonly creator_id?: string;
 }
 
 export interface WsStandings {
@@ -129,6 +143,13 @@ export interface WsRaceResult {
   readonly results: ReadonlyArray<RaceResult>;
 }
 
+export interface WsParticipantExited {
+  readonly type: 'participant_exited';
+  readonly race_id: string;
+  readonly user_id: string;
+  readonly username: string;
+}
+
 export interface WsError {
   readonly type: 'error';
   readonly message: string;
@@ -139,4 +160,5 @@ export type ServerMessage =
   | WsStandings
   | WsProgramWorkout
   | WsRaceResult
+  | WsParticipantExited
   | WsError;

@@ -60,6 +60,9 @@ function broadcastRaceState(race: ActiveRace, countdown?: number): void {
     state: race.state,
     countdown,
     participants,
+    format: race.config.format,
+    target_value: race.config.target_value,
+    creator_id: race.creatorId,
   });
 
   sendToRoom(race.id, msg);
@@ -67,7 +70,7 @@ function broadcastRaceState(race: ActiveRace, countdown?: number): void {
 
 function broadcastStandings(race: ActiveRace): void {
   const entries = [...race.participants.values()]
-    .filter((p) => p.status === 'racing' || p.status === 'finished')
+    .filter((p) => p.status === 'racing' || p.status === 'finished' || p.status === 'dnf')
     .sort((a, b) => {
       // Distance race: more distance = higher position
       if (race.config.format === 'distance') return b.distance - a.distance;
@@ -122,6 +125,7 @@ export function activateRace(raceId: string): void {
 
   const race: ActiveRace = {
     id: raceId,
+    creatorId: dbRace.creator_id,
     state: 'warmup',
     config: {
       format: dbRace.format,
@@ -352,7 +356,7 @@ function finishRace(race: ActiveRace): void {
     };
   });
 
-  // Also store DQ'd participants
+  // Also store DQ'd participants (DNF already stored at exit time)
   for (const p of race.participants.values()) {
     if (p.status === 'disqualified') {
       queries.updateParticipantResult.run(
@@ -360,6 +364,22 @@ function finishRace(race: ActiveRace): void {
         race.id, p.userId
       );
     }
+  }
+
+  // Add DNF participants to results (after finishers, no placement)
+  const dnfParticipants = [...race.participants.values()]
+    .filter((p) => p.status === 'dnf');
+  for (const p of dnfParticipants) {
+    results.push({
+      user_id: p.userId,
+      username: p.username,
+      placement: 0,
+      final_time: p.elapsedTime,
+      final_distance: p.distance,
+      final_avg_pace: p.averagePace,
+      final_calories: p.calories,
+      final_stroke_count: p.strokeCount,
+    });
   }
 
   sendToRoom(race.id, JSON.stringify({
@@ -387,7 +407,7 @@ function cancelRace(race: ActiveRace): void {
 
 function getActiveParticipants(race: ActiveRace): LiveParticipant[] {
   return [...race.participants.values()].filter(
-    (p) => p.status !== 'disqualified'
+    (p) => p.status !== 'disqualified' && p.status !== 'dnf'
   );
 }
 
@@ -428,6 +448,12 @@ export function handleRaceMessage(
       break;
     case 'race_data':
       handleRaceData(raceId, ws.data.userId, msg.data);
+      break;
+    case 'exit_race':
+      handleExitRace(raceId, ws.data.userId, ws.data.username);
+      break;
+    case 'force_finish':
+      handleForceFinish(raceId, ws.data.userId);
       break;
   }
 }
@@ -489,6 +515,93 @@ function handleRaceData(raceId: string, userId: string, data: any): void {
     queries.updateParticipantStatus.run('finished', raceId, userId);
     console.log(`[race] ${raceId}: ${participant.username} FINISHED`);
     checkRaceCompletion(race);
+  }
+}
+
+// ── TEST ONLY: Force-finish with dummy data ──
+
+function handleForceFinish(raceId: string, userId: string): void {
+  const race = activeRaces.get(raceId);
+  if (!race || race.state !== 'racing') return;
+
+  // Only the race creator can force-finish
+  if (race.creatorId !== userId) return;
+
+  console.log(`[race] ${raceId}: FORCE FINISH (test) by creator`);
+
+  const isDistance = race.config.format === 'distance';
+  const target = race.config.target_value;
+
+  // Generate dummy data for all racing participants
+  let placement = 0;
+  for (const p of race.participants.values()) {
+    if (p.status !== 'racing') continue;
+    placement++;
+
+    // Stagger times/distances so placements differ
+    const jitter = placement - 1;
+
+    if (isDistance) {
+      // Distance race: all finish the target distance, with staggered times
+      p.distance = target;
+      p.elapsedTime = 420 + jitter * 15; // ~7min base + 15s per place
+      p.averagePace = (p.elapsedTime / (target / 500)); // pace per 500m
+    } else {
+      // Time race: all race for the target time, with staggered distances
+      p.elapsedTime = target;
+      p.distance = 2000 - jitter * 80; // ~2000m base - 80m per place
+      p.averagePace = (target / (p.distance / 500));
+    }
+
+    p.strokeRate = 28 + Math.floor(Math.random() * 6);
+    p.heartRate = 155 + Math.floor(Math.random() * 20);
+    p.watts = 180 + Math.floor(Math.random() * 60);
+    p.calories = Math.floor(p.elapsedTime * 0.25);
+    p.strokeCount = Math.floor(p.elapsedTime * p.strokeRate / 60);
+
+    p.status = 'finished';
+    queries.updateParticipantStatus.run('finished', raceId, p.userId);
+  }
+
+  finishRace(race);
+}
+
+function handleExitRace(raceId: string, userId: string, username: string): void {
+  const race = activeRaces.get(raceId);
+  if (!race) return;
+
+  const participant = race.participants.get(userId);
+  if (!participant) return;
+  // Only allow exit from active states
+  if (participant.status !== 'racing' && participant.status !== 'joined' &&
+      participant.status !== 'warmup_confirmed' && participant.status !== 'ready') return;
+
+  participant.status = 'dnf';
+  queries.updateParticipantStatus.run('dnf', raceId, userId);
+  console.log(`[race] ${raceId}: ${username} exited (DNF)`);
+
+  // Store partial results for DNF participant
+  queries.updateParticipantResult.run(
+    participant.elapsedTime, participant.distance, participant.averagePace,
+    participant.calories, participant.strokeCount, null, 'dnf',
+    raceId, userId
+  );
+
+  // Notify other participants
+  sendToRoom(raceId, JSON.stringify({
+    type: 'participant_exited',
+    race_id: raceId,
+    user_id: userId,
+    username,
+  }));
+
+  broadcastRaceState(race);
+
+  // Check if race should end or be canceled
+  if (race.state === 'racing') {
+    checkRaceCompletion(race);
+  } else if (shouldCancel(race)) {
+    cancelRace(race);
   }
 }
 

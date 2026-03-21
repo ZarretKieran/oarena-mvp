@@ -62,7 +62,7 @@ export function renderHistory(container: HTMLElement): void {
           </div>
           <div style="display:flex; justify-content:space-between; margin-top:8px; color:var(--text-dim); font-size:0.85rem">
             <span>${formatDate(r.created_at)}</span>
-            <span>${r.participant_status === 'disqualified' ? 'DQ' : placementLabel(r.placement)}</span>
+            <span>${r.participant_status === 'disqualified' ? 'DQ' : r.participant_status === 'dnf' ? 'DNF' : placementLabel(r.placement)}</span>
             ${r.final_avg_pace ? `<span>${formatPace(r.final_avg_pace)} avg</span>` : ''}
           </div>
         </div>

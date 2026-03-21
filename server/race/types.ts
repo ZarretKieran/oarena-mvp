@@ -19,6 +19,7 @@ export interface LiveParticipant {
 
 export interface ActiveRace {
   id: string;
+  creatorId: string;
   state: RaceState;
   config: RaceConfig;
   warmupStartTime: number;

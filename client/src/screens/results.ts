@@ -71,12 +71,17 @@ export function renderResults(container: HTMLElement, raceId: string): void {
         return;
       }
 
-      // Build results from participant data
-      const finishedParticipants = data.participants
-        .filter((p: any) => p.placement !== null)
-        .sort((a: any, b: any) => (a.placement ?? 999) - (b.placement ?? 999));
+      // Build results from participant data (finished + DNF)
+      const scoredParticipants = data.participants
+        .filter((p: any) => p.placement !== null || p.status === 'dnf')
+        .sort((a: any, b: any) => {
+          // Placed finishers first, then DNF
+          if (a.placement && !b.placement) return -1;
+          if (!a.placement && b.placement) return 1;
+          return (a.placement ?? 999) - (b.placement ?? 999);
+        });
 
-      results = finishedParticipants.map((p: any) => ({
+      results = scoredParticipants.map((p: any) => ({
         user_id: p.user_id,
         username: p.username,
         placement: p.placement ?? 0,
@@ -85,6 +90,7 @@ export function renderResults(container: HTMLElement, raceId: string): void {
         final_avg_pace: p.final_avg_pace ?? 0,
         final_calories: p.final_calories ?? 0,
         final_stroke_count: p.final_stroke_count ?? 0,
+        status: p.status,
       }));
 
       renderContent();
@@ -111,11 +117,14 @@ export function renderResults(container: HTMLElement, raceId: string): void {
 
     const myResult = results.find(r => r.user_id === user?.id);
     const myPlacement = myResult?.placement ?? 0;
+    const myDnf = (myResult as any)?.status === 'dnf';
 
     contentEl.innerHTML = `
       <div class="results-header">
         ${myResult ? `
-          <p class="results-placement ${placementClass(myPlacement)}">${placementLabel(myPlacement)}</p>
+          <p class="results-placement ${myDnf ? '' : placementClass(myPlacement)}" ${myDnf ? 'style="color:var(--red)"' : ''}>
+            ${myDnf ? 'DNF' : placementLabel(myPlacement)}
+          </p>
           <p class="results-label">
             ${formatTime(myResult.final_time)} &middot;
             ${Math.floor(myResult.final_distance)}m &middot;
@@ -128,13 +137,17 @@ export function renderResults(container: HTMLElement, raceId: string): void {
 
       <div class="card">
         <h3 style="margin-bottom:8px">Final Standings</h3>
-        ${results.map(r => `
+        ${results.map(r => {
+          const isDnf = (r as any).status === 'dnf' || r.placement === 0;
+          return `
           <div class="result-row ${r.user_id === user?.id ? 'self-row' : ''}">
-            <span class="result-pos ${placementClass(r.placement)}">${placementLabel(r.placement)}</span>
+            <span class="result-pos ${isDnf ? '' : placementClass(r.placement)}" ${isDnf ? 'style="color:var(--red)"' : ''}>
+              ${isDnf ? 'DNF' : placementLabel(r.placement)}
+            </span>
             <span class="result-name">${r.username}</span>
             <span class="result-stat">${formatTime(r.final_time)} / ${formatPace(r.final_avg_pace)}</span>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
 
       ${myResult ? `

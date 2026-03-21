@@ -81,6 +81,10 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
       programWorkout(msg.config);
       renderContent();
     }
+
+    if (msg.type === 'participant_exited' && msg.race_id === raceId) {
+      // Race state broadcast will update the participants list automatically
+    }
   });
 
   function cleanup() {

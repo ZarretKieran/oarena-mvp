@@ -38,6 +38,9 @@ export function createWsHandler() {
               race_id: race.id,
               state: race.state,
               participants,
+              format: race.config.format,
+              target_value: race.config.target_value,
+              creator_id: race.creatorId,
             }));
           }
           return;
