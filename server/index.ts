@@ -22,13 +22,7 @@ app.route('/api/history', history);
 // Health check
 app.get('/api/health', (c) => c.json({ ok: true }));
 
-// Temporary admin reset — delete all races and participants
-app.delete('/api/admin/reset-races', async (c) => {
-  const { db } = await import('./db');
-  db.run('DELETE FROM race_participants');
-  db.run('DELETE FROM races');
-  return c.json({ ok: true, message: 'All races and participants deleted' });
-});
+
 
 // Serve static client files in production
 const clientDist = join(import.meta.dir, '..', 'client', 'dist');
