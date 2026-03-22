@@ -22,17 +22,38 @@ function formatWarmupTime(ts: number): string {
   return `${dateStr} ${timeStr}`;
 }
 
+function stateLabel(state: string): { text: string; color: string } {
+  switch (state) {
+    case 'open': return { text: 'Open', color: 'var(--green)' };
+    case 'warmup': return { text: 'Warming Up', color: 'var(--yellow)' };
+    case 'ready_check': return { text: 'Ready Check', color: 'var(--orange)' };
+    case 'countdown': return { text: 'Starting...', color: 'var(--orange)' };
+    case 'racing': return { text: 'Racing', color: 'var(--red)' };
+    default: return { text: state, color: 'var(--text-dim)' };
+  }
+}
+
 function renderRaceCard(race: any, currentUserId: string): string {
   const isCreator = race.creator_id === currentUserId;
+  const isJoined = race.is_joined > 0;
   const isFull = race.participant_count >= race.max_participants;
-  const canJoin = !isCreator && !isFull && race.state === 'open';
-  const isJoined = false; // TODO: track from participant list
+  const canJoin = !isJoined && !isFull && race.state === 'open';
+  const showLobby = isJoined && race.state !== 'finished' && race.state !== 'canceled';
+  const sl = stateLabel(race.state);
+
+  const joinedBadge = isJoined
+    ? `<span class="badge" style="background:var(--green);color:#000;font-size:0.65rem">Joined</span>`
+    : '';
+  const creatorBadge = isCreator
+    ? `<span class="badge" style="background:var(--blue);color:#fff;font-size:0.65rem">Your Race</span>`
+    : '';
 
   return `
     <div class="card race-card" data-race-id="${race.id}">
       <div class="card-header">
         <span class="card-title">${race.creator_username}'s Race</span>
-        <div>
+        <div style="display:flex;gap:4px;align-items:center">
+          ${creatorBadge}${joinedBadge}
           <span class="badge badge-${race.race_type}">${race.race_type}</span>
           <span class="badge badge-${race.format}">${race.format}</span>
         </div>
@@ -40,14 +61,15 @@ function renderRaceCard(race: any, currentUserId: string): string {
       <div class="race-card-details">
         <div class="race-card-target">${formatTarget(race.format, race.target_value)}</div>
         <div class="race-card-meta">
-          <span>${formatWarmupTime(race.warmup_start_time)}</span>
+          <span style="color:${sl.color};font-weight:600">${sl.text}</span>
+          <span>🕐 ${formatWarmupTime(race.warmup_start_time)}</span>
           <span>${race.participant_count}/${race.max_participants} joined</span>
         </div>
       </div>
       <div class="race-card-actions">
         ${canJoin ? `<button class="btn-primary join-btn" data-race-id="${race.id}">Join Race</button>` : ''}
-        ${isCreator || isFull ? `<button class="btn-primary lobby-btn" data-race-id="${race.id}">View Lobby</button>` : ''}
-        ${isFull && !isCreator ? `<span class="race-card-full">Full</span>` : ''}
+        ${showLobby ? `<button class="btn-primary lobby-btn" data-race-id="${race.id}">${race.state === 'racing' ? 'View Race' : 'View Lobby'}</button>` : ''}
+        ${isFull && !isJoined ? `<span class="race-card-full">Full</span>` : ''}
       </div>
     </div>
   `;

@@ -10,7 +10,8 @@ races.use('*', authMiddleware);
 
 // List open/active races (feed)
 races.get('/', (c) => {
-  const rows = queries.listOpenRaces.all();
+  const userId = c.get('userId') as string;
+  const rows = queries.listOpenRaces.all(userId);
   return c.json({ races: rows });
 });
 

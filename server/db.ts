@@ -76,9 +76,10 @@ export const queries = {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ),
   getRaceById: db.prepare<any, [string]>('SELECT * FROM races WHERE id = ?'),
-  listOpenRaces: db.prepare<any, []>(
+  listOpenRaces: db.prepare<any, [string]>(
     `SELECT r.*, u.username as creator_username,
-       (SELECT COUNT(*) FROM race_participants WHERE race_id = r.id) as participant_count
+       (SELECT COUNT(*) FROM race_participants WHERE race_id = r.id) as participant_count,
+       (SELECT COUNT(*) FROM race_participants WHERE race_id = r.id AND user_id = ?) as is_joined
      FROM races r
      JOIN users u ON u.id = r.creator_id
      WHERE r.state IN ('open', 'warmup', 'ready_check', 'countdown', 'racing')
