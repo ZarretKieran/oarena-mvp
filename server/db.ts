@@ -25,15 +25,25 @@ db.run(`
     id TEXT PRIMARY KEY,
     creator_id TEXT NOT NULL REFERENCES users(id),
     race_type TEXT NOT NULL CHECK(race_type IN ('duel', 'group')),
-    format TEXT NOT NULL CHECK(format IN ('distance', 'time')),
+    format TEXT NOT NULL CHECK(format IN ('distance', 'time', 'interval_distance', 'interval_time')),
     target_value INTEGER NOT NULL,
     split_value INTEGER NOT NULL,
     warmup_start_time INTEGER NOT NULL,
     max_participants INTEGER NOT NULL DEFAULT 2,
     state TEXT NOT NULL DEFAULT 'open',
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    interval_count INTEGER,
+    rest_seconds INTEGER
   )
 `);
+
+// Migration: add interval columns if they don't exist (for existing DBs)
+try {
+  db.run(`ALTER TABLE races ADD COLUMN interval_count INTEGER`);
+} catch (_) { /* column already exists */ }
+try {
+  db.run(`ALTER TABLE races ADD COLUMN rest_seconds INTEGER`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS race_participants (
@@ -71,9 +81,9 @@ export const queries = {
   >('SELECT id, username, created_at FROM users WHERE id = ?'),
 
   // Races
-  insertRace: db.prepare<void, [string, string, string, string, number, number, number, number, number]>(
-    `INSERT INTO races (id, creator_id, race_type, format, target_value, split_value, warmup_start_time, max_participants, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  insertRace: db.prepare<void, [string, string, string, string, number, number, number, number, number, number | null, number | null]>(
+    `INSERT INTO races (id, creator_id, race_type, format, target_value, split_value, warmup_start_time, max_participants, created_at, interval_count, rest_seconds)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ),
   getRaceById: db.prepare<any, [string]>('SELECT * FROM races WHERE id = ?'),
   listOpenRaces: db.prepare<any, [string]>(

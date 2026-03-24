@@ -25,14 +25,17 @@ races.post('/', async (c) => {
     split_value?: number;
     warmup_start_time?: number;
     max_participants?: number;
+    interval_count?: number;
+    rest_seconds?: number;
   }>();
 
   // Validate
   if (!body.race_type || !['duel', 'group'].includes(body.race_type)) {
     return c.json({ error: 'race_type must be "duel" or "group"' }, 400);
   }
-  if (!body.format || !['distance', 'time'].includes(body.format)) {
-    return c.json({ error: 'format must be "distance" or "time"' }, 400);
+  const validFormats = ['distance', 'time', 'interval_distance', 'interval_time'];
+  if (!body.format || !validFormats.includes(body.format)) {
+    return c.json({ error: 'format must be one of: ' + validFormats.join(', ') }, 400);
   }
   if (!body.target_value || body.target_value <= 0) {
     return c.json({ error: 'target_value must be positive' }, 400);
@@ -41,8 +44,21 @@ races.post('/', async (c) => {
     return c.json({ error: 'warmup_start_time must be in the future' }, 400);
   }
 
-  const splitValue = body.split_value ?? (body.format === 'distance' ? 500 : 300);
+  const isInterval = body.format === 'interval_distance' || body.format === 'interval_time';
+  if (isInterval) {
+    if (!body.interval_count || body.interval_count < 1) {
+      return c.json({ error: 'interval_count must be at least 1' }, 400);
+    }
+    if (body.rest_seconds == null || body.rest_seconds < 0) {
+      return c.json({ error: 'rest_seconds must be >= 0 for intervals' }, 400);
+    }
+  }
+
+  const isDistanceBased = body.format === 'distance' || body.format === 'interval_distance';
+  const splitValue = body.split_value ?? (isDistanceBased ? 500 : 300);
   const maxParticipants = body.race_type === 'duel' ? 2 : (body.max_participants ?? 8);
+  const intervalCount = isInterval ? (body.interval_count ?? 1) : null;
+  const restSeconds = isInterval ? (body.rest_seconds ?? 60) : null;
 
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -50,7 +66,8 @@ races.post('/', async (c) => {
   queries.insertRace.run(
     id, userId, body.race_type, body.format,
     body.target_value, splitValue,
-    body.warmup_start_time, maxParticipants, now
+    body.warmup_start_time, maxParticipants, now,
+    intervalCount, restSeconds
   );
 
   // Creator auto-joins

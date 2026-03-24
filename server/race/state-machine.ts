@@ -131,6 +131,8 @@ export function activateRace(raceId: string): void {
       format: dbRace.format,
       target_value: dbRace.target_value,
       split_value: dbRace.split_value,
+      interval_count: dbRace.interval_count ?? undefined,
+      rest_seconds: dbRace.rest_seconds ?? undefined,
     },
     warmupStartTime: dbRace.warmup_start_time,
     maxParticipants: dbRace.max_participants,
@@ -330,8 +332,9 @@ function finishRace(race: ActiveRace): void {
   const finished = [...race.participants.values()]
     .filter((p) => p.status === 'finished');
 
-  // Sort by completion: distance race → lowest elapsed_time; time race → most distance
-  if (race.config.format === 'distance') {
+  // Sort by completion: distance-based → lowest elapsed_time; time-based → most distance
+  const isDistanceBased = race.config.format === 'distance' || race.config.format === 'interval_distance';
+  if (isDistanceBased) {
     finished.sort((a, b) => a.elapsedTime - b.elapsedTime);
   } else {
     finished.sort((a, b) => b.distance - a.distance);
@@ -529,8 +532,10 @@ function handleForceFinish(raceId: string, userId: string): void {
 
   console.log(`[race] ${raceId}: FORCE FINISH (test) by creator`);
 
-  const isDistance = race.config.format === 'distance';
-  const target = race.config.target_value;
+  const isDistance = race.config.format === 'distance' || race.config.format === 'interval_distance';
+  const intervalMultiplier = (race.config.format === 'interval_distance' || race.config.format === 'interval_time')
+    ? (race.config.interval_count ?? 1) : 1;
+  const target = race.config.target_value * intervalMultiplier;
 
   // Generate dummy data for all racing participants
   let placement = 0;
@@ -606,9 +611,21 @@ function handleExitRace(raceId: string, userId: string, username: string): void 
 }
 
 function checkParticipantFinished(race: ActiveRace, p: LiveParticipant): boolean {
-  if (race.config.format === 'distance') {
+  const fmt = race.config.format;
+
+  // PM5 workout_state 5 = finished (universal signal for all formats)
+  if (p.workoutState === 5) return true;
+
+  if (fmt === 'distance') {
     return p.distance >= race.config.target_value;
-  } else {
+  } else if (fmt === 'time') {
     return p.elapsedTime >= race.config.target_value;
+  } else if (fmt === 'interval_distance') {
+    const totalDist = (race.config.interval_count ?? 1) * race.config.target_value;
+    return p.distance >= totalDist;
+  } else if (fmt === 'interval_time') {
+    const totalWork = (race.config.interval_count ?? 1) * race.config.target_value;
+    return p.elapsedTime >= totalWork;
   }
+  return false;
 }

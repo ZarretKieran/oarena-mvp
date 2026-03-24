@@ -1,7 +1,7 @@
 // ── Race domain types (shared between client and server) ──
 
 export type RaceType = 'duel' | 'group';
-export type RaceFormat = 'distance' | 'time';
+export type RaceFormat = 'distance' | 'time' | 'interval_distance' | 'interval_time';
 
 export type RaceState =
   | 'open'
@@ -23,8 +23,10 @@ export type ParticipantStatus =
 
 export interface RaceConfig {
   readonly format: RaceFormat;
-  readonly target_value: number;  // meters (distance) or seconds (time)
+  readonly target_value: number;  // meters (distance/interval_distance) or seconds (time/interval_time)
   readonly split_value: number;   // split meters or split seconds
+  readonly interval_count?: number;  // number of intervals (e.g., 5)
+  readonly rest_seconds?: number;    // rest between intervals in seconds (e.g., 60)
 }
 
 export interface Race {
