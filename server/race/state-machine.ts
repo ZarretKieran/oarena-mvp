@@ -1,9 +1,11 @@
 import type { ServerWebSocket } from 'bun';
 import type { WsData } from '../ws/rooms';
-import type { ClientMessage, RaceState, Participant } from '../../shared/types';
+import type { ClientMessage, Participant, RaceFormat, RaceState, RaceProgressionUpdate } from '../../shared/types';
 import type { ActiveRace, LiveParticipant } from './types';
 import { sendToRoom, getRoomSockets } from '../ws/rooms';
 import { queries } from '../db';
+import { applyLpChange, calculateEloChanges, DEFAULT_DIVISION, DEFAULT_ELO, DEFAULT_LP, DEFAULT_TIER, eloToTierDivision } from './elo';
+import { checkAchievements, countPersonalBests } from './achievements';
 
 // ── Constants ──
 
@@ -385,14 +387,215 @@ function finishRace(race: ActiveRace): void {
     });
   }
 
+  const progressionUpdates = computeProgression(race, results);
+
   sendToRoom(race.id, JSON.stringify({
     type: 'race_result',
     race_id: race.id,
     results,
+    progression_updates: progressionUpdates,
   }));
 
   broadcastRaceState(race);
   removeActiveRace(race.id);
+}
+
+function computeProgression(race: ActiveRace, results: Array<{
+  user_id: string;
+  username: string;
+  placement: number;
+  final_time: number | null;
+  final_distance: number | null;
+  final_avg_pace: number | null;
+  final_calories: number | null;
+  final_stroke_count: number | null;
+}>): RaceProgressionUpdate[] {
+  const participants = [...race.participants.values()]
+    .filter((participant) =>
+      participant.status === 'finished' ||
+      participant.status === 'dnf' ||
+      participant.status === 'disqualified'
+    );
+
+  for (const participant of participants) {
+    queries.ensureUserStats.run(participant.userId);
+  }
+
+  const resultByUser = new Map(results.map((result) => [result.user_id, result]));
+  const ratingParticipants = participants.map((participant) => {
+    const stats = queries.getUserStats.get(participant.userId) ?? defaultStats(participant.userId);
+    const result = resultByUser.get(participant.userId);
+    return {
+      userId: participant.userId,
+      elo: stats.elo,
+      placementRaces: stats.placement_races,
+      placement: result?.placement ?? 0,
+      status: participant.status,
+    };
+  });
+
+  const eloChanges = calculateEloChanges(ratingParticipants);
+
+  return participants.map((participant) => {
+    const oldStats = queries.getUserStats.get(participant.userId) ?? defaultStats(participant.userId);
+    const eloChange = eloChanges.find((entry) => entry.userId === participant.userId) ?? {
+      userId: participant.userId,
+      oldElo: oldStats.elo,
+      newElo: oldStats.elo,
+      eloDelta: 0,
+    };
+    const oldTier = oldStats.tier;
+    const oldDivision = oldStats.division;
+    const oldLp = oldStats.lp;
+    const result = resultByUser.get(participant.userId);
+    const isWin = result?.placement === 1;
+    const nextPlacementRaces = oldStats.placement_races + 1;
+    const nextWins = oldStats.wins + (isWin ? 1 : 0);
+    const nextLosses = oldStats.losses + (isWin ? 0 : 1);
+    const nextTotalRaces = oldStats.total_races + 1;
+    const nextMeters = oldStats.total_meters + (participant.distance || 0);
+    const nextTime = oldStats.total_time + (participant.elapsedTime || 0);
+    const nextCurrentStreak = isWin ? oldStats.current_streak + 1 : 0;
+    const nextBestStreak = Math.max(oldStats.best_streak, nextCurrentStreak);
+    const lpOutcome = applyLpChange({
+      elo: oldStats.elo,
+      tier: oldTier,
+      division: oldDivision,
+      lp: oldLp,
+      demotionShield: oldStats.demotion_shield ?? 0,
+    }, eloChange.eloDelta);
+    const nextTierDivision = eloToTierDivision(eloChange.newElo);
+    const nextTier = nextTierDivision.tier;
+    const nextDivision = lpOutcome.isPromotion || lpOutcome.isDemotion ? lpOutcome.division : nextTierDivision.division;
+    const nextLp = lpOutcome.lp;
+
+    const pbOutcome = maybeUpdatePersonalBest(race.id, race.config.format, race.config.target_value, race.config.interval_count ?? 0, race.config.rest_seconds ?? 0, participant);
+    const personalBests = queries.getPersonalBests.all(participant.userId);
+    const unlockedAchievementIds = checkAchievements(participant.userId, {
+      stats: {
+        user_id: participant.userId,
+        elo: eloChange.newElo,
+        tier: nextTier,
+        division: nextDivision,
+        lp: nextLp,
+        wins: nextWins,
+        losses: nextLosses,
+        total_races: nextTotalRaces,
+        total_meters: nextMeters,
+        total_time: nextTime,
+        current_streak: nextCurrentStreak,
+        best_streak: nextBestStreak,
+        placement_races: nextPlacementRaces,
+      },
+      totalPbs: countPersonalBests(personalBests),
+      raceDistance: participant.distance,
+      isTwoKSubSeven: race.config.format === 'distance' && race.config.target_value === 2000 && participant.elapsedTime > 0 && participant.elapsedTime < 420,
+      wodCompletions: getWodCompletionCount(participant.userId),
+      highestTier: nextTier,
+    });
+
+    queries.updateUserStats.run(
+      eloChange.newElo,
+      nextTier,
+      nextDivision,
+      nextLp,
+      nextWins,
+      nextLosses,
+      nextTotalRaces,
+      nextMeters,
+      nextTime,
+      nextCurrentStreak,
+      nextBestStreak,
+      nextPlacementRaces,
+      lpOutcome.demotionShield,
+      participant.userId,
+    );
+
+    return {
+      user_id: participant.userId,
+      old_elo: oldStats.elo,
+      new_elo: eloChange.newElo,
+      elo_delta: eloChange.eloDelta,
+      old_tier: oldTier,
+      new_tier: nextTier,
+      old_division: oldDivision,
+      new_division: nextDivision,
+      lp_before: oldLp,
+      lp_after: nextLp,
+      is_promotion: lpOutcome.isPromotion || oldTier !== nextTier || oldDivision !== nextDivision,
+      is_demotion: lpOutcome.isDemotion,
+      is_personal_best: pbOutcome,
+      unlocked_achievement_ids: unlockedAchievementIds,
+    };
+  });
+}
+
+function defaultStats(userId: string) {
+  return {
+    user_id: userId,
+    elo: DEFAULT_ELO,
+    tier: DEFAULT_TIER,
+    division: DEFAULT_DIVISION,
+    lp: DEFAULT_LP,
+    wins: 0,
+    losses: 0,
+    total_races: 0,
+    total_meters: 0,
+    total_time: 0,
+    current_streak: 0,
+    best_streak: 0,
+    placement_races: 0,
+    demotion_shield: 0,
+  };
+}
+
+function maybeUpdatePersonalBest(
+  raceId: string,
+  format: RaceFormat,
+  targetValue: number,
+  intervalCount: number,
+  restSeconds: number,
+  participant: LiveParticipant,
+): boolean {
+  if (participant.status !== 'finished') return false;
+
+  const existing = queries.getPersonalBest.get(
+    participant.userId,
+    format,
+    targetValue,
+    intervalCount,
+    restSeconds,
+  );
+  const isDistanceBased = format === 'distance' || format === 'interval_distance';
+  const nextBestTime = participant.elapsedTime || null;
+  const nextBestDistance = participant.distance || null;
+  const nextBestPace = participant.averagePace || null;
+
+  const isBetter = !existing || (
+    isDistanceBased
+      ? (existing.best_time == null || (nextBestTime != null && nextBestTime < existing.best_time))
+      : (existing.best_distance == null || (nextBestDistance != null && nextBestDistance > existing.best_distance))
+  );
+
+  if (!isBetter) return false;
+
+  queries.upsertPersonalBest.run(
+    participant.userId,
+    format,
+    targetValue,
+    intervalCount,
+    restSeconds,
+    nextBestTime,
+    nextBestDistance,
+    nextBestPace,
+    raceId,
+    Date.now(),
+  );
+  return true;
+}
+
+function getWodCompletionCount(userId: string): number {
+  return queries.countUserWodEntries.get(userId)?.count ?? 0;
 }
 
 // ── CANCELED ──

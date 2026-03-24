@@ -3,6 +3,10 @@ import { cors } from 'hono/cors';
 import { auth } from './routes/auth';
 import { races } from './routes/races';
 import { history } from './routes/history';
+import { users } from './routes/users';
+import { leaderboard } from './routes/leaderboard';
+import { achievements } from './routes/achievements';
+import { wod } from './routes/wod';
 import { createWsHandler, authenticateWsUpgrade } from './ws/handler';
 import { startScheduler } from './race/scheduler';
 import type { WsData } from './ws/rooms';
@@ -18,6 +22,10 @@ app.use('*', cors({ origin: '*' }));
 app.route('/api/auth', auth);
 app.route('/api/races', races);
 app.route('/api/history', history);
+app.route('/api/users', users);
+app.route('/api/leaderboard', leaderboard);
+app.route('/api/achievements', achievements);
+app.route('/api/wod', wod);
 
 // Health check
 app.get('/api/health', (c) => c.json({ ok: true }));

@@ -2,6 +2,7 @@
 
 export type RaceType = 'duel' | 'group';
 export type RaceFormat = 'distance' | 'time' | 'interval_distance' | 'interval_time';
+export type LeagueTier = 'novice' | 'club' | 'varsity' | 'elite' | 'olympic' | 'world_class';
 
 export type RaceState =
   | 'open'
@@ -29,6 +30,101 @@ export interface RaceConfig {
   readonly rest_seconds?: number;    // rest between intervals in seconds (e.g., 60)
 }
 
+export interface LeagueInfo {
+  readonly elo: number;
+  readonly tier: LeagueTier;
+  readonly division: number;
+  readonly lp: number;
+}
+
+export interface UserStats extends LeagueInfo {
+  readonly user_id: string;
+  readonly wins: number;
+  readonly losses: number;
+  readonly total_races: number;
+  readonly total_meters: number;
+  readonly total_time: number;
+  readonly current_streak: number;
+  readonly best_streak: number;
+  readonly placement_races: number;
+  readonly rank?: number;
+}
+
+export interface PersonalBest {
+  readonly user_id: string;
+  readonly format: RaceFormat;
+  readonly target_value: number;
+  readonly interval_count?: number;
+  readonly rest_seconds?: number;
+  readonly best_time?: number;
+  readonly best_distance?: number;
+  readonly best_pace?: number;
+  readonly race_id: string;
+  readonly achieved_at: number;
+}
+
+export interface AchievementDef {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly icon: string;
+  readonly category: string;
+  readonly threshold: number;
+}
+
+export interface UserAchievement {
+  readonly achievement_id: string;
+  readonly progress: number;
+  readonly unlocked_at?: number;
+  readonly definition?: AchievementDef;
+}
+
+export interface UserProfile {
+  readonly user: {
+    readonly id: string;
+    readonly username: string;
+    readonly created_at: number;
+  };
+  readonly stats: UserStats;
+}
+
+export interface DailyChallenge {
+  readonly id: string;
+  readonly date: string;
+  readonly format: RaceFormat;
+  readonly target_value: number;
+  readonly interval_count?: number;
+  readonly rest_seconds?: number;
+  readonly title: string;
+  readonly description: string;
+}
+
+export interface WodEntry {
+  readonly challenge_id: string;
+  readonly user_id: string;
+  readonly username: string;
+  readonly result_time?: number;
+  readonly result_distance?: number;
+  readonly completed_at: number;
+}
+
+export interface RaceProgressionUpdate {
+  readonly user_id: string;
+  readonly old_elo: number;
+  readonly new_elo: number;
+  readonly elo_delta: number;
+  readonly old_tier: LeagueTier;
+  readonly new_tier: LeagueTier;
+  readonly old_division: number;
+  readonly new_division: number;
+  readonly lp_before: number;
+  readonly lp_after: number;
+  readonly is_promotion: boolean;
+  readonly is_demotion: boolean;
+  readonly is_personal_best: boolean;
+  readonly unlocked_achievement_ids: ReadonlyArray<string>;
+}
+
 export interface Race {
   readonly id: string;
   readonly creator_id: string;
@@ -42,6 +138,10 @@ export interface Race {
   readonly state: RaceState;
   readonly created_at: number;
   readonly participant_count: number;
+  readonly creator_elo?: number;
+  readonly creator_tier?: LeagueTier;
+  readonly creator_division?: number;
+  readonly creator_lp?: number;
 }
 
 export interface Participant {
@@ -143,6 +243,7 @@ export interface WsRaceResult {
   readonly type: 'race_result';
   readonly race_id: string;
   readonly results: ReadonlyArray<RaceResult>;
+  readonly progression_updates?: ReadonlyArray<RaceProgressionUpdate>;
 }
 
 export interface WsParticipantExited {
