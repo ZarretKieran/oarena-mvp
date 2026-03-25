@@ -245,6 +245,21 @@ export const queries = {
      ORDER BY us.elo DESC, us.total_races DESC, u.created_at ASC
      LIMIT ? OFFSET ?`
   ),
+  getLeaderboardFull: db.prepare<any, []>(
+    `SELECT u.id, u.username, us.elo, us.tier, us.division, us.lp, us.wins, us.losses,
+            us.total_races, us.current_streak, us.best_streak
+     FROM user_stats us
+     JOIN users u ON u.id = us.user_id
+     ORDER BY us.elo DESC, us.total_races DESC, u.created_at ASC`
+  ),
+  getSurgingLeaderboard: db.prepare<any, [number]>(
+    `SELECT u.id, u.username, us.elo, us.tier, us.division, us.lp, us.wins, us.losses,
+            us.total_races, us.current_streak, us.best_streak
+     FROM user_stats us
+     JOIN users u ON u.id = us.user_id
+     ORDER BY us.current_streak DESC, us.elo DESC, us.total_races DESC, u.created_at ASC
+     LIMIT ?`
+  ),
   getUserLeaderboardRank: db.prepare<{ rank: number }, [number, number, string, string]>(
     `SELECT COUNT(*) + 1 as rank
      FROM user_stats

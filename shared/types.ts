@@ -88,6 +88,44 @@ export interface UserProfile {
   readonly stats: UserStats;
 }
 
+export interface LeaderboardEntry extends LeagueInfo {
+  readonly user_id: string;
+  readonly username: string;
+  readonly wins: number;
+  readonly losses: number;
+  readonly total_races: number;
+  readonly current_streak: number;
+  readonly best_streak: number;
+  readonly rank: number;
+}
+
+export interface RankedOverviewCompetitor {
+  readonly user_id: string;
+  readonly username: string;
+  readonly rank: number;
+  readonly elo: number;
+  readonly tier: LeagueTier;
+  readonly division: number;
+  readonly current_streak: number;
+  readonly elo_gap: number;
+}
+
+export interface RankedOverviewInsight {
+  readonly promotion_state: 'promotion_pressure' | 'hold_your_line' | 'climbing_steadily';
+  readonly elo_to_next_rank: number | null;
+  readonly target_user?: RankedOverviewCompetitor;
+  readonly threat_user?: RankedOverviewCompetitor;
+}
+
+export interface RankedOverview {
+  readonly me: UserStats;
+  readonly podium: ReadonlyArray<LeaderboardEntry>;
+  readonly nearby: ReadonlyArray<LeaderboardEntry>;
+  readonly top: ReadonlyArray<LeaderboardEntry>;
+  readonly surging: ReadonlyArray<LeaderboardEntry>;
+  readonly insight: RankedOverviewInsight;
+}
+
 export interface DailyChallenge {
   readonly id: string;
   readonly date: string;
