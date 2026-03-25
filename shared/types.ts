@@ -146,6 +146,11 @@ export interface WodEntry {
   readonly completed_at: number;
 }
 
+export interface WodHistoryDay {
+  readonly challenge: DailyChallenge;
+  readonly leaderboard: ReadonlyArray<WodEntry>;
+}
+
 export interface RaceProgressionUpdate {
   readonly user_id: string;
   readonly old_elo: number;

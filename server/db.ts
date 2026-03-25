@@ -316,6 +316,11 @@ export const queries = {
   getWodToday: db.prepare<any, [string]>(
     `SELECT * FROM daily_challenges WHERE date = ?`
   ),
+  listRecentWodChallenges: db.prepare<any, [number]>(
+    `SELECT * FROM daily_challenges
+     ORDER BY date DESC
+     LIMIT ?`
+  ),
   insertDailyChallenge: db.prepare<void, [string, string, string, number, number | null, number | null, string, string]>(
     `INSERT OR IGNORE INTO daily_challenges (
        id, date, format, target_value, interval_count, rest_seconds, title, description
