@@ -16,9 +16,14 @@ db.run(`
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    deleted_at INTEGER
   )
 `);
+
+try {
+  db.run(`ALTER TABLE users ADD COLUMN deleted_at INTEGER`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS races (
@@ -157,11 +162,35 @@ export const queries = {
   getUserByUsername: db.prepare<
     { id: string; username: string; password_hash: string; created_at: number },
     [string]
-  >('SELECT * FROM users WHERE username = ?'),
+  >('SELECT * FROM users WHERE username = ? AND deleted_at IS NULL'),
   getUserById: db.prepare<
     { id: string; username: string; created_at: number },
     [string]
-  >('SELECT id, username, created_at FROM users WHERE id = ?'),
+  >('SELECT id, username, created_at FROM users WHERE id = ? AND deleted_at IS NULL'),
+  softDeleteUser: db.prepare<void, [string, string, number, string]>(
+    'UPDATE users SET username = ?, password_hash = ?, deleted_at = ? WHERE id = ?'
+  ),
+  deleteUserStats: db.prepare<void, [string]>(
+    'DELETE FROM user_stats WHERE user_id = ?'
+  ),
+  deleteUserPersonalBests: db.prepare<void, [string]>(
+    'DELETE FROM personal_bests WHERE user_id = ?'
+  ),
+  deleteUserAchievements: db.prepare<void, [string]>(
+    'DELETE FROM user_achievements WHERE user_id = ?'
+  ),
+  deleteUserWodEntries: db.prepare<void, [string]>(
+    'DELETE FROM wod_entries WHERE user_id = ?'
+  ),
+  deleteUserRaceParticipations: db.prepare<void, [string]>(
+    'DELETE FROM race_participants WHERE user_id = ?'
+  ),
+  cancelActiveRacesByCreator: db.prepare<void, [string]>(
+    `UPDATE races
+     SET state = 'canceled'
+     WHERE creator_id = ?
+       AND state IN ('open', 'warmup', 'ready_check', 'countdown', 'racing')`
+  ),
 
   // Races
   insertRace: db.prepare<void, [string, string, string, string, number, number, number, number, number, number | null, number | null]>(

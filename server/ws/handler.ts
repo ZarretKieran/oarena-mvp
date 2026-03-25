@@ -67,8 +67,11 @@ export function createWsHandler() {
 export async function authenticateWsUpgrade(
   req: Request
 ): Promise<WsData | null> {
+  const authHeader = req.headers.get('Authorization');
+  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const url = new URL(req.url);
-  const token = url.searchParams.get('token');
+  const queryToken = url.searchParams.get('token');
+  const token = headerToken ?? queryToken;
   if (!token) return null;
 
   const payload = await verifyJwt(token);

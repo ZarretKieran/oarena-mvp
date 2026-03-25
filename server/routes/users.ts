@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { authMiddleware } from '../auth';
-import { queries } from '../db';
+import { db, queries } from '../db';
 
 const users = new Hono();
 
@@ -52,6 +52,25 @@ users.get('/:id/achievements', (c) => {
   const userId = c.req.param('id');
   const achievements = queries.getUserAchievements.all(userId);
   return c.json({ achievements });
+});
+
+users.delete('/me', (c) => {
+  const userId = c.get('userId');
+  const deletionTime = Date.now();
+  const replacementUsername = `deleted_${userId.slice(0, 8)}_${deletionTime}`;
+  const replacementPasswordHash = `deleted_${crypto.randomUUID()}`;
+
+  db.transaction(() => {
+    queries.cancelActiveRacesByCreator.run(userId);
+    queries.deleteUserRaceParticipations.run(userId);
+    queries.deleteUserWodEntries.run(userId);
+    queries.deleteUserAchievements.run(userId);
+    queries.deleteUserPersonalBests.run(userId);
+    queries.deleteUserStats.run(userId);
+    queries.softDeleteUser.run(replacementUsername, replacementPasswordHash, deletionTime, userId);
+  })();
+
+  return c.json({});
 });
 
 export { users };

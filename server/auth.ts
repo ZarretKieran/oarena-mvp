@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono';
+import { queries } from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'oarena-dev-secret-change-in-prod';
 const encoder = new TextEncoder();
@@ -93,6 +94,11 @@ export async function authMiddleware(c: Context, next: Next) {
   const token = authHeader.slice(7);
   const payload = await verifyJwt(token);
   if (!payload) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+
+  const user = queries.getUserById.get(payload.sub);
+  if (!user) {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
