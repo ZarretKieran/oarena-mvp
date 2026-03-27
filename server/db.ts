@@ -215,6 +215,12 @@ export const queries = {
   updateRaceState: db.prepare<void, [string, string]>(
     'UPDATE races SET state = ? WHERE id = ?'
   ),
+  deleteRaceParticipants: db.prepare<void, [string]>(
+    'DELETE FROM race_participants WHERE race_id = ?'
+  ),
+  deleteRaceById: db.prepare<void, [string]>(
+    'DELETE FROM races WHERE id = ?'
+  ),
 
   // Participants
   insertParticipant: db.prepare<void, [string, string, number]>(

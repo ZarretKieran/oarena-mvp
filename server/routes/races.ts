@@ -117,4 +117,26 @@ races.get('/:id', (c) => {
   return c.json({ race, participants });
 });
 
+// Delete an open race created by the current user
+races.delete('/:id', (c) => {
+  const userId = c.get('userId') as string;
+  const raceId = c.req.param('id');
+
+  const race = queries.getRaceById.get(raceId);
+  if (!race) {
+    return c.json({ error: 'Race not found' }, 404);
+  }
+  if (race.creator_id !== userId) {
+    return c.json({ error: 'Only the race creator can delete this race' }, 403);
+  }
+  if (race.state !== 'open') {
+    return c.json({ error: 'Only open races can be deleted' }, 400);
+  }
+
+  queries.deleteRaceParticipants.run(raceId);
+  queries.deleteRaceById.run(raceId);
+
+  return c.json({ ok: true });
+});
+
 export { races };
