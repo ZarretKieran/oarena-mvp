@@ -147,10 +147,20 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS waitlist_signups (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    source TEXT,
+    created_at INTEGER NOT NULL
+  )
+`);
+
 db.run(`CREATE INDEX IF NOT EXISTS idx_races_state ON races(state, warmup_start_time)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_participants_user ON race_participants(user_id)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_elo ON user_stats(elo DESC)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_wod_entries_challenge ON wod_entries(challenge_id, completed_at DESC)`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_waitlist_signups_created_at ON waitlist_signups(created_at DESC)`);
 
 // ── Prepared queries ──
 
@@ -417,6 +427,13 @@ export const queries = {
      FROM races r
      JOIN race_participants rp ON rp.race_id = r.id
      WHERE r.id = ? AND rp.user_id = ?`
+  ),
+  insertWaitlistSignup: db.prepare<void, [string, string, string | null, number]>(
+    `INSERT OR IGNORE INTO waitlist_signups (id, email, source, created_at)
+     VALUES (?, ?, ?, ?)`
+  ),
+  getWaitlistSignupByEmail: db.prepare<any, [string]>(
+    `SELECT * FROM waitlist_signups WHERE email = ?`
   ),
 };
 

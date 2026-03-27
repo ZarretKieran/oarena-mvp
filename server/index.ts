@@ -7,6 +7,7 @@ import { users } from './routes/users';
 import { leaderboard } from './routes/leaderboard';
 import { achievements } from './routes/achievements';
 import { wod } from './routes/wod';
+import { waitlist } from './routes/waitlist';
 import { createWsHandler, authenticateWsUpgrade } from './ws/handler';
 import { startScheduler } from './race/scheduler';
 import type { WsData } from './ws/rooms';
@@ -26,6 +27,7 @@ app.route('/api/users', users);
 app.route('/api/leaderboard', leaderboard);
 app.route('/api/achievements', achievements);
 app.route('/api/wod', wod);
+app.route('/api/waitlist', waitlist);
 
 // Health check
 app.get('/api/health', (c) => c.json({ ok: true }));
