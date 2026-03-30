@@ -5,7 +5,7 @@ import { unlinkSync } from 'fs';
 const testDbPath = `/tmp/oarena-waitlist-${Date.now()}.db`;
 process.env.DB_PATH = testDbPath;
 
-const [{ waitlist, normalizeWaitlistEmail, isValidWaitlistEmail }, { db }] = await Promise.all([
+const [{ waitlist, normalizeWaitlistName, normalizeWaitlistEmail, isValidWaitlistEmail }, { db }] = await Promise.all([
   import(`../routes/waitlist.ts?test=${Date.now()}`),
   import(`../db.ts?test=${Date.now()}`),
 ]);
@@ -15,6 +15,10 @@ app.route('/api/waitlist', waitlist);
 
 beforeEach(() => {
   db.run('DELETE FROM waitlist_signups');
+});
+
+test('normalizeWaitlistName trims and collapses whitespace', () => {
+  expect(normalizeWaitlistName('  Zara   Kieran  ')).toBe('Zara Kieran');
 });
 
 test('normalizeWaitlistEmail trims and lowercases email addresses', () => {
@@ -32,6 +36,7 @@ test('POST /api/waitlist accepts valid emails and persists a normalized record',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      name: '  Zara   Kieran ',
       email: '  Racer@Example.COM ',
       source: 'Landing_Page',
     }),
@@ -41,12 +46,27 @@ test('POST /api/waitlist accepts valid emails and persists a normalized record',
   expect(await response.json()).toEqual({ ok: true });
 
   const signup = db
-    .query('SELECT email, source FROM waitlist_signups')
-    .get() as { email: string; source: string | null } | null;
+    .query('SELECT name, email, source FROM waitlist_signups')
+    .get() as { name: string; email: string; source: string | null } | null;
 
   expect(signup).not.toBeNull();
+  expect(signup?.name).toBe('Zara Kieran');
   expect(signup?.email).toBe('racer@example.com');
   expect(signup?.source).toBe('landing_page');
+});
+
+test('POST /api/waitlist rejects missing name input', async () => {
+  const response = await app.request('/api/waitlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'racer@example.com',
+      source: 'landing_page',
+    }),
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: 'Valid name required' });
 });
 
 test('POST /api/waitlist rejects invalid email input', async () => {
@@ -54,6 +74,7 @@ test('POST /api/waitlist rejects invalid email input', async () => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      name: 'Zara Kieran',
       email: 'bad-email',
       source: 'landing_page',
     }),
@@ -65,6 +86,7 @@ test('POST /api/waitlist rejects invalid email input', async () => {
 
 test('POST /api/waitlist is idempotent for duplicate email submissions', async () => {
   const payload = JSON.stringify({
+    name: 'Zara Kieran',
     email: 'racer@example.com',
     source: 'landing_page',
   });
@@ -94,13 +116,13 @@ test('POST /api/waitlist survives repeated casing and whitespace variants', asyn
   await app.request('/api/waitlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: ' Racer@Example.com ' }),
+    body: JSON.stringify({ name: ' Racer ', email: ' Racer@Example.com ' }),
   });
 
   await app.request('/api/waitlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'racer@example.com' }),
+    body: JSON.stringify({ name: 'Racer', email: 'racer@example.com' }),
   });
 
   const count = db

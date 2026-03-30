@@ -150,11 +150,16 @@ db.run(`
 db.run(`
   CREATE TABLE IF NOT EXISTS waitlist_signups (
     id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     source TEXT,
     created_at INTEGER NOT NULL
   )
 `);
+
+try {
+  db.run(`ALTER TABLE waitlist_signups ADD COLUMN name TEXT NOT NULL DEFAULT ''`);
+} catch (_) { /* column already exists */ }
 
 db.run(`CREATE INDEX IF NOT EXISTS idx_races_state ON races(state, warmup_start_time)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_participants_user ON race_participants(user_id)`);
@@ -428,9 +433,9 @@ export const queries = {
      JOIN race_participants rp ON rp.race_id = r.id
      WHERE r.id = ? AND rp.user_id = ?`
   ),
-  insertWaitlistSignup: db.prepare<void, [string, string, string | null, number]>(
-    `INSERT OR IGNORE INTO waitlist_signups (id, email, source, created_at)
-     VALUES (?, ?, ?, ?)`
+  insertWaitlistSignup: db.prepare<void, [string, string, string, string | null, number]>(
+    `INSERT OR IGNORE INTO waitlist_signups (id, name, email, source, created_at)
+     VALUES (?, ?, ?, ?, ?)`
   ),
   getWaitlistSignupByEmail: db.prepare<any, [string]>(
     `SELECT * FROM waitlist_signups WHERE email = ?`
