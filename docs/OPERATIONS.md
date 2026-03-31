@@ -132,6 +132,23 @@ Behavior:
 - duplicate emails are idempotent because inserts use `INSERT OR IGNORE`
 - successful and duplicate submissions both return `{ "ok": true }`
 
+## Test Data Marker
+
+Operational tables now support an `is_test INTEGER NOT NULL DEFAULT 0` marker for seeded mock data.
+
+Tables with `is_test`:
+
+- `users`
+- `races`
+- `race_participants`
+- `user_stats`
+- `personal_bests`
+- `user_achievements`
+- `daily_challenges`
+- `wod_entries`
+
+This marker exists specifically so production mock/demo data can be inserted, queried, and deleted safely later without relying on fragile username or ID patterns.
+
 ## Waitlist Integrations
 
 ### API
@@ -204,6 +221,36 @@ railway ssh -s oarena-mvp bun /app/server/scripts/query-waitlist.ts
 railway ssh -s oarena-mvp bun /app/server/scripts/query-waitlist.ts --limit 50 --json
 railway ssh -s oarena-mvp bun /app/server/scripts/query-waitlist.ts --limit 50 --raw-emails
 ```
+
+## Production Test-Data Scripts
+
+Seed a fully marked production test universe:
+
+```bash
+railway ssh -s oarena-mvp bun /app/server/scripts/seed-test-data.ts
+```
+
+Optional custom login username/password for the seeded self account:
+
+```bash
+railway ssh -s oarena-mvp bun /app/server/scripts/seed-test-data.ts --self-username test_zarret --password oarena-demo-password
+```
+
+Clear all mock data later:
+
+```bash
+railway ssh -s oarena-mvp bun /app/server/scripts/clear-test-data.ts
+```
+
+What the production test seed creates:
+
+- 1 dedicated test self user
+- 30 additional test users
+- open, finished, and canceled test races
+- test leaderboard and progression rows
+- test PBs and achievements
+- test WOD entries
+- every inserted row marked with `is_test = 1`
 
 ## Environment Variables
 

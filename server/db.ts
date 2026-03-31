@@ -17,12 +17,16 @@ db.run(`
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    deleted_at INTEGER
+    deleted_at INTEGER,
+    is_test INTEGER NOT NULL DEFAULT 0
   )
 `);
 
 try {
   db.run(`ALTER TABLE users ADD COLUMN deleted_at INTEGER`);
+} catch (_) { /* column already exists */ }
+try {
+  db.run(`ALTER TABLE users ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
 } catch (_) { /* column already exists */ }
 
 db.run(`
@@ -38,7 +42,8 @@ db.run(`
     state TEXT NOT NULL DEFAULT 'open',
     created_at INTEGER NOT NULL,
     interval_count INTEGER,
-    rest_seconds INTEGER
+    rest_seconds INTEGER,
+    is_test INTEGER NOT NULL DEFAULT 0
   )
 `);
 
@@ -48,6 +53,9 @@ try {
 } catch (_) { /* column already exists */ }
 try {
   db.run(`ALTER TABLE races ADD COLUMN rest_seconds INTEGER`);
+} catch (_) { /* column already exists */ }
+try {
+  db.run(`ALTER TABLE races ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
 } catch (_) { /* column already exists */ }
 
 db.run(`
@@ -62,9 +70,13 @@ db.run(`
     final_stroke_count INTEGER,
     placement INTEGER,
     joined_at INTEGER NOT NULL,
+    is_test INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (race_id, user_id)
   )
 `);
+try {
+  db.run(`ALTER TABLE race_participants ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS user_stats (
@@ -81,9 +93,13 @@ db.run(`
     current_streak INTEGER NOT NULL DEFAULT 0,
     best_streak INTEGER NOT NULL DEFAULT 0,
     placement_races INTEGER NOT NULL DEFAULT 0,
-    demotion_shield INTEGER NOT NULL DEFAULT 0
+    demotion_shield INTEGER NOT NULL DEFAULT 0,
+    is_test INTEGER NOT NULL DEFAULT 0
   )
 `);
+try {
+  db.run(`ALTER TABLE user_stats ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS personal_bests (
@@ -97,9 +113,13 @@ db.run(`
     best_pace REAL,
     race_id TEXT NOT NULL REFERENCES races(id),
     achieved_at INTEGER NOT NULL,
+    is_test INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, format, target_value, interval_count, rest_seconds)
   )
 `);
+try {
+  db.run(`ALTER TABLE personal_bests ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS achievements_def (
@@ -118,9 +138,13 @@ db.run(`
     achievement_id TEXT NOT NULL REFERENCES achievements_def(id),
     progress INTEGER NOT NULL DEFAULT 0,
     unlocked_at INTEGER,
+    is_test INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, achievement_id)
   )
 `);
+try {
+  db.run(`ALTER TABLE user_achievements ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS daily_challenges (
@@ -131,9 +155,13 @@ db.run(`
     interval_count INTEGER,
     rest_seconds INTEGER,
     title TEXT NOT NULL,
-    description TEXT NOT NULL
+    description TEXT NOT NULL,
+    is_test INTEGER NOT NULL DEFAULT 0
   )
 `);
+try {
+  db.run(`ALTER TABLE daily_challenges ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS wod_entries (
@@ -143,9 +171,13 @@ db.run(`
     result_time REAL,
     result_distance REAL,
     completed_at INTEGER NOT NULL,
+    is_test INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (challenge_id, user_id)
   )
 `);
+try {
+  db.run(`ALTER TABLE wod_entries ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`);
+} catch (_) { /* column already exists */ }
 
 db.run(`
   CREATE TABLE IF NOT EXISTS waitlist_signups (
