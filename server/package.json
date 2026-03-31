@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "bun --watch index.ts",
     "start": "bun index.ts",
-    "test": "bun test ./tests"
+    "test": "bun test ./tests",
+    "waitlist:query": "bun ./scripts/query-waitlist.ts",
+    "seed:demo": "bun ./scripts/seed-demo-data.ts"
   },
   "dependencies": {
     "hono": "^4.7.0"
