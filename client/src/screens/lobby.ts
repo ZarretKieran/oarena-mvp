@@ -1,7 +1,7 @@
 import { getRace, getStoredUser } from '../api';
 import { sendWs, onWsMessage } from '../ws';
 import { navigate } from '../router';
-import { connectErg, isErgConnected, programWorkout, setRaceId, onErgState } from '../erg';
+import { connectErg, isErgConnected, programWorkout, resetRaceFlow, setRaceId, onErgState, syncRaceCountdown } from '../erg';
 import type { ServerMessage, Participant, RaceState, RaceConfig } from '../../../shared/types';
 
 function formatTarget(format: string, value: number): string {
@@ -88,6 +88,9 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
   let raceState: RaceState = 'open';
   let raceFormat = '';
   let raceTarget = 0;
+  let raceSplitValue = 500;
+  let raceIntervalCount: number | undefined;
+  let raceRestSeconds: number | undefined;
   let raceType = '';
   let maxParticipants = 2;
   let creatorUsername = '';
@@ -107,9 +110,28 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
     if (msg.type === 'race_state' && msg.race_id === raceId) {
       raceState = msg.state;
       participants = [...msg.participants];
+      if (msg.format) raceFormat = msg.format;
+      if (msg.target_value !== undefined) raceTarget = msg.target_value;
+      if (msg.split_value !== undefined) raceSplitValue = msg.split_value;
+      if (msg.interval_count !== undefined) raceIntervalCount = msg.interval_count;
+      if (msg.rest_seconds !== undefined) raceRestSeconds = msg.rest_seconds;
       if (msg.countdown !== undefined) {
         startCountdown(msg.countdown);
       }
+
+      const liveConfig = currentRaceConfig();
+      if (liveConfig && msg.state === 'countdown' && msg.countdown !== undefined) {
+        syncRaceCountdown(liveConfig, msg.countdown).catch((err) => {
+          console.warn('[lobby] PM5 countdown sync failed', err);
+        });
+      } else if (liveConfig && msg.state === 'racing') {
+        syncRaceCountdown(liveConfig, 0).catch((err) => {
+          console.warn('[lobby] PM5 race start sync failed', err);
+        });
+      } else if (msg.state !== 'countdown') {
+        resetRaceFlow();
+      }
+
       renderContent();
 
       if (msg.state === 'racing') {
@@ -124,7 +146,9 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
 
     if (msg.type === 'program_workout') {
       raceConfig = msg.config;
-      programWorkout(msg.config);
+      programWorkout(msg.config).catch((err) => {
+        console.warn('[lobby] PM5 fallback program failed', err);
+      });
       renderContent();
     }
   });
@@ -132,6 +156,7 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
   function cleanup() {
     unsub();
     if (countdownInterval) clearInterval(countdownInterval);
+    resetRaceFlow();
   }
 
   function startCountdown(seconds: number) {
@@ -154,6 +179,9 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
       raceState = data.race.state;
       raceFormat = data.race.format;
       raceTarget = data.race.target_value;
+      raceSplitValue = data.race.split_value ?? raceSplitValue;
+      raceIntervalCount = data.race.interval_count ?? raceIntervalCount;
+      raceRestSeconds = data.race.rest_seconds ?? raceRestSeconds;
       raceType = data.race.race_type;
       maxParticipants = data.race.max_participants;
       creatorUsername = data.race.creator_username ?? '';
@@ -237,7 +265,7 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
           ${countdownValue}
         </div>
         <p style="text-align:center;color:var(--text-dim);margin-bottom:12px">
-          ${countdownValue > 15 ? 'Race starting soon...' : countdownValue > 0 ? 'PM5 being programmed — sit still!' : 'GO!'}
+          ${countdownValue > 15 ? 'Race is about to begin. Stop rowing and hold ready.' : countdownValue > 0 ? 'PM5 race start is armed. Wait for ATTENTION... GO!' : 'GO!'}
         </p>
       ` : ''}
 
@@ -291,6 +319,18 @@ export function renderLobby(container: HTMLElement, raceId: string): void {
         sendWs({ type: 'ready', race_id: raceId });
       });
     }
+  }
+
+  function currentRaceConfig(): RaceConfig | null {
+    if (!raceFormat || !raceTarget) return null;
+
+    return {
+      format: raceFormat as RaceConfig['format'],
+      target_value: raceTarget,
+      split_value: raceSplitValue,
+      interval_count: raceIntervalCount,
+      rest_seconds: raceRestSeconds,
+    };
   }
 
   loadRace();

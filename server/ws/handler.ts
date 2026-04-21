@@ -37,9 +37,13 @@ export function createWsHandler() {
               type: 'race_state',
               race_id: race.id,
               state: race.state,
+              countdown: race.countdownRemaining ?? undefined,
               participants,
               format: race.config.format,
               target_value: race.config.target_value,
+              split_value: race.config.split_value,
+              interval_count: race.config.interval_count,
+              rest_seconds: race.config.rest_seconds,
               creator_id: race.creatorId,
             }));
           }

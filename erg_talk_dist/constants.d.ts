@@ -31,7 +31,11 @@ export declare const CSAFE: {
     readonly SETTWORK_CMD: 32;
     readonly SETHORIZONTAL_CMD: 33;
     readonly SETPROGRAM_CMD: 36;
+    readonly SETUSERCFG1_CMD: 26;
     readonly SETPMCFG_CMD: 118;
+    readonly SETPMDATA_CMD: 119;
+    readonly GETPMCFG_CMD: 126;
+    readonly GETPMDATA_CMD: 127;
     readonly GOINUSE_CMD: 133;
     readonly GOFINISHED_CMD: 134;
     readonly GOREADY_CMD: 135;
@@ -39,6 +43,8 @@ export declare const CSAFE: {
 /** PM5 proprietary sub-command codes (used inside SETPMCFG_CMD 0x76 wrapper) */
 export declare const PM: {
     readonly SET_WORKOUTTYPE: 1;
+    readonly SET_RACETYPE: 9;
+    readonly SET_RACESTARTPARAMS: 13;
     readonly SET_WORKOUTDURATION: 3;
     readonly SET_RESTDURATION: 4;
     readonly SET_SPLITDURATION: 5;
@@ -46,6 +52,21 @@ export declare const PM: {
     readonly CONFIGURE_WORKOUT: 20;
     readonly SET_INTERVALTYPE: 23;
     readonly SET_INTERVALCOUNT: 24;
+    readonly SET_RACEOPERATIONTYPE: 30;
+};
+export declare const PM_GET_CFG: {
+    readonly SCREEN_STATE_STATUS: 133;
+};
+export declare const PM_GET_DATA: {
+    readonly WORKOUT_TYPE: 137;
+    readonly WORKOUT_STATE: 141;
+    readonly STROKE_PACE_500M: 168;
+    readonly AVG_PACE_500M: 175;
+    readonly STROKE_RATE: 179;
+    readonly STROKE_STATE: 191;
+    readonly DRAG_FACTOR: 193;
+    readonly ERROR_VALUE: 201;
+    readonly RACE_DATA: 198;
 };
 /** Workout type values for PM.SET_WORKOUTTYPE */
 export declare const WORKOUT_TYPE: {
@@ -62,6 +83,63 @@ export declare const WORKOUT_TYPE: {
 export declare const DUR_TYPE: {
     readonly TIME: 0;
     readonly DISTANCE: 128;
+};
+export declare const SCREEN_TYPE: {
+    readonly NONE: 0;
+    readonly WORKOUT: 1;
+    readonly RACE: 2;
+    readonly CSAFE: 3;
+};
+export declare const SCREEN_VALUE_WORKOUT: {
+    readonly NONE: 0;
+    readonly PREPARE_TO_ROW: 1;
+    readonly TERMINATE_WORKOUT: 2;
+    readonly REARM_WORKOUT: 3;
+    readonly PREPARE_TO_RACE_START: 5;
+    readonly GO_TO_MAIN_SCREEN: 6;
+};
+export declare const SCREEN_VALUE_RACE: {
+    readonly NONE: 0;
+    readonly WARMUP_FOR_RACE: 3;
+    readonly PREPARE_TO_RACE: 4;
+    readonly FALSE_START_RACE: 5;
+    readonly TERMINATE_RACE: 6;
+    readonly SET_PARTICIPANT_LIST: 8;
+    readonly SYNC_RACE_TIME: 9;
+    readonly RACE_IDLE: 13;
+};
+export declare const START_TYPE: {
+    readonly RANDOM: 0;
+    readonly COUNTDOWN: 1;
+    readonly RANDOM_MODIFIED: 2;
+    readonly IMMEDIATE: 3;
+    readonly WAIT_FOR_FLYWHEEL: 4;
+};
+export declare const RACE_TYPE: {
+    readonly FIXED_DISTANCE_SINGLE: 0;
+    readonly FIXED_TIME_SINGLE: 1;
+    readonly WORKOUT_RACE_START: 4;
+    readonly FIXED_CAL_SINGLE: 5;
+};
+export declare const RACE_OPERATION: {
+    readonly DISABLE: 0;
+    readonly PARTICIPATION_REQUEST: 1;
+    readonly SLEEP: 2;
+    readonly ERG_INIT: 3;
+    readonly PHY_ADDR_INIT: 4;
+    readonly RACE_WARMUP: 5;
+    readonly RACE_INIT: 6;
+    readonly TIME_SYNC: 7;
+    readonly RACE_WAIT_TO_START: 8;
+    readonly START: 9;
+    readonly FALSE_START: 10;
+    readonly TERMINATE: 11;
+    readonly IDLE: 12;
+};
+export declare const SCREEN_STATUS: {
+    readonly INACTIVE: 0;
+    readonly PENDING: 1;
+    readonly IN_PROGRESS: 2;
 };
 /** CSAFE unit code for meters */
 export declare const UNIT_METER = 36;

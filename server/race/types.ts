@@ -26,6 +26,7 @@ export interface ActiveRace {
   maxParticipants: number;
   raceType: 'duel' | 'group';
   participants: Map<string, LiveParticipant>;
+  countdownRemaining: number | null;
   countdownTimer: ReturnType<typeof setTimeout> | null;
   warmupTimer: ReturnType<typeof setTimeout> | null;
   readyCheckTimer: ReturnType<typeof setTimeout> | null;

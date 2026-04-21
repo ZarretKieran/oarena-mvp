@@ -260,6 +260,9 @@ export interface WsRaceState {
   readonly participants: ReadonlyArray<Participant>;
   readonly format?: RaceFormat;
   readonly target_value?: number;
+  readonly split_value?: number;
+  readonly interval_count?: number;
+  readonly rest_seconds?: number;
   readonly creator_id?: string;
 }
 

@@ -420,6 +420,7 @@ test('force finishing a race updates Elo and replaces only a better personal bes
       ['user-1', makeParticipant('user-1', 'alice', 420)],
       ['user-2', makeParticipant('user-2', 'bob', 435)],
     ]) as any,
+    countdownRemaining: null,
     countdownTimer: null,
     warmupTimer: null,
     readyCheckTimer: null,

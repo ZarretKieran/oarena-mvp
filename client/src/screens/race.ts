@@ -1,8 +1,8 @@
 import { getStoredUser } from '../api';
 import { onWsMessage, sendWs } from '../ws';
 import { navigate } from '../router';
-import { onErgData, setRaceId, isErgConnected, connectErg } from '../erg';
-import type { ServerMessage, RaceFormat } from '../../../shared/types';
+import { onErgData, setRaceId, isErgConnected, connectErg, resetRaceFlow, syncRaceCountdown } from '../erg';
+import type { ServerMessage, RaceConfig, RaceFormat } from '../../../shared/types';
 
 function formatPace(seconds: number): string {
   if (!seconds || seconds <= 0 || seconds > 999) return '--:--';
@@ -33,6 +33,9 @@ export function renderRace(container: HTMLElement, raceId: string): void {
   // Race config (populated from race_state messages)
   let raceFormat: RaceFormat | null = null;
   let targetValue = 0;
+  let splitValue = 500;
+  let intervalCount: number | undefined;
+  let restSeconds: number | undefined;
   let creatorId: string | null = null;
 
   // Local PM5 data
@@ -101,8 +104,24 @@ export function renderRace(container: HTMLElement, raceId: string): void {
 
     if (msg.type === 'race_state' && msg.race_id === raceId) {
       if (msg.format) raceFormat = msg.format;
-      if (msg.target_value) targetValue = msg.target_value;
+      if (msg.target_value !== undefined) targetValue = msg.target_value;
+      if (msg.split_value !== undefined) splitValue = msg.split_value;
+      if (msg.interval_count !== undefined) intervalCount = msg.interval_count;
+      if (msg.rest_seconds !== undefined) restSeconds = msg.rest_seconds;
       if (msg.creator_id) creatorId = msg.creator_id;
+
+      const config = currentRaceConfig();
+      if (config && msg.state === 'countdown' && msg.countdown !== undefined) {
+        syncRaceCountdown(config, msg.countdown).catch((err) => {
+          console.warn('[race] PM5 countdown sync failed', err);
+        });
+      } else if (config && msg.state === 'racing') {
+        syncRaceCountdown(config, 0).catch((err) => {
+          console.warn('[race] PM5 race start sync failed', err);
+        });
+      } else if (msg.state !== 'countdown') {
+        resetRaceFlow();
+      }
 
       if (msg.state === 'finished' || msg.state === 'canceled') {
         raceFinished = true;
@@ -125,6 +144,7 @@ export function renderRace(container: HTMLElement, raceId: string): void {
   function cleanup() {
     unsub();
     onErgData(() => {}); // clear callback
+    resetRaceFlow();
   }
 
   function exitRace() {
@@ -274,6 +294,18 @@ export function renderRace(container: HTMLElement, raceId: string): void {
         sendWs({ type: 'force_finish', race_id: raceId });
       });
     }
+  }
+
+  function currentRaceConfig(): RaceConfig | null {
+    if (!raceFormat || !targetValue) return null;
+
+    return {
+      format: raceFormat,
+      target_value: targetValue,
+      split_value: splitValue,
+      interval_count: intervalCount,
+      rest_seconds: restSeconds,
+    };
   }
 
   renderContent();

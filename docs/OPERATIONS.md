@@ -1,15 +1,22 @@
 # Oarena MVP Operations
 
-Last updated: 2026-03-30
+Last updated: 2026-04-21
 
 This document is the backend and website operations reference for the current Oarena MVP stack.
+
+Current PM5 testing note:
+
+- browser PM5 validation now happens through the core web app in `oarena_mvp/client`
+- the browser client stages PM5 race setup from `race_state.countdown`
+- the old `program_workout at T-15` race-start path has been removed from the server state machine
+- `erg-talk` is vendored into this repo via `oarena_mvp/erg_talk_dist` and aliased as `erg-talk` in the Vite client
 
 ## Repositories
 
 - Backend/web app repo: [https://github.com/ZarretKieran/oarena-mvp](https://github.com/ZarretKieran/oarena-mvp)
   - Local path: `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp`
   - Current branch at time of writing: `master`
-  - Current deployed backend commit at time of writing: `826c570569147f0606f74db2490fca7acf420b81`
+  - Current repo commit at time of writing: `99eb43caec5469e979ca6fcf9123b0397b8da8c5`
 - iOS app workspace:
   - Local path: `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_ios`
 - Animated marketing site workspace:
@@ -46,6 +53,14 @@ cd /Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp
 git push origin master
 railway status
 curl -sf https://oarena-mvp-production.up.railway.app/api/health
+```
+
+PM5 web-client verification:
+
+```bash
+cd /Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/client
+npm install
+npm run build
 ```
 
 ### Minimal website
@@ -96,6 +111,27 @@ bun install
 bun run dev
 bun test ./tests
 ```
+
+## PM5 Race Flow
+
+Current countdown and PM5 behavior:
+
+- race state still transitions `open -> warmup -> ready_check -> countdown -> racing -> finished|canceled`
+- the server now broadcasts full PM5-relevant race config on every `race_state`
+- the browser lobby and race screens derive PM5 setup directly from `race_state`
+- browser PM5 control stages:
+  - prepare workout once at countdown start
+  - arm fixed distance/time race start at `T-15`
+  - trigger race start at `T-0`
+- if the browser reconnects during countdown, the websocket bootstrap path now includes current countdown and full config so PM5 staging can recover
+
+Important implementation files:
+
+- `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/client/src/erg.ts`
+- `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/client/src/screens/lobby.ts`
+- `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/client/src/screens/race.ts`
+- `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/server/race/state-machine.ts`
+- `/Users/zarretkieran/Desktop/Oarena_Prototype_2026/oarena_mvp/server/ws/handler.ts`
 
 ## Database
 
@@ -252,6 +288,26 @@ What the production test seed creates:
 - test WOD entries
 - every inserted row marked with `is_test = 1`
 
+Current seeded production demo login:
+
+- username: `test_zarret`
+- password: `oarena-demo-password`
+
+Current seeded production counts at time of writing:
+
+- `users`: 31
+- `races`: 27
+- `race_participants`: 109
+- `user_stats`: 31
+- `personal_bests`: 43
+- `user_achievements`: 527
+- `wod_entries`: 85
+
+Notes:
+
+- test WOD entries are marked with `is_test = 1`
+- `daily_challenges` may remain real production rows for the same dates when they already exist, so the current seeded run may show `0` test-marked `daily_challenges` while still exposing fully test-marked WOD entries
+
 ## Environment Variables
 
 Documented in:
@@ -292,5 +348,6 @@ curl -sf -X POST https://oarena-mvp-production.up.railway.app/api/waitlist \
 ## Notes
 
 - The backend service serves the core PM5 web app from `oarena_mvp/client/dist` when those assets are built and present.
+- the browser app is the preferred short-loop PM5 validation surface for current CSAFE/race-start work
 - The minimal marketing site is a separate Railway service and URL.
 - The animated `landing_page` and minimal `minimal_website` are separate local workspaces with different positioning and presentation styles but the same waitlist backend.

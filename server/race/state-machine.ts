@@ -14,7 +14,6 @@ const MAX_WARMUP_MS = 30 * 60 * 1000;   // 30 minutes
 const LATE_THRESHOLD_MS = 5 * 60 * 1000; // 5 min late → DQ
 const READY_CHECK_MS = 30 * 1000;        // 30 seconds to confirm
 const COUNTDOWN_SECONDS = 60;
-const PROGRAM_PM5_AT = 15;               // program PM5 at T-15s
 const STANDINGS_INTERVAL_MS = 500;
 
 // ── In-memory store ──
@@ -64,6 +63,9 @@ function broadcastRaceState(race: ActiveRace, countdown?: number): void {
     participants,
     format: race.config.format,
     target_value: race.config.target_value,
+    split_value: race.config.split_value,
+    interval_count: race.config.interval_count,
+    rest_seconds: race.config.rest_seconds,
     creator_id: race.creatorId,
   });
 
@@ -140,6 +142,7 @@ export function activateRace(raceId: string): void {
     maxParticipants: dbRace.max_participants,
     raceType: dbRace.race_type,
     participants,
+    countdownRemaining: null,
     countdownTimer: null,
     warmupTimer: null,
     readyCheckTimer: null,
@@ -264,6 +267,7 @@ function startCountdown(race: ActiveRace): void {
   if (race.readyCheckTimer) { clearTimeout(race.readyCheckTimer); race.readyCheckTimer = null; }
 
   race.state = 'countdown';
+  race.countdownRemaining = COUNTDOWN_SECONDS;
   queries.updateRaceState.run('countdown', race.id);
   console.log(`[race] ${race.id} → COUNTDOWN (${COUNTDOWN_SECONDS}s)`);
 
@@ -272,15 +276,7 @@ function startCountdown(race: ActiveRace): void {
 
   const tick = () => {
     remaining--;
-
-    // Program PM5 at T-15s
-    if (remaining === PROGRAM_PM5_AT) {
-      sendToRoom(race.id, JSON.stringify({
-        type: 'program_workout',
-        config: race.config,
-      }));
-      console.log(`[race] ${race.id}: PM5 program sent (T-${PROGRAM_PM5_AT}s)`);
-    }
+    race.countdownRemaining = Math.max(remaining, 0);
 
     if (remaining <= 0) {
       if (race.countdownTimer) { clearTimeout(race.countdownTimer); race.countdownTimer = null; }
@@ -299,6 +295,7 @@ function startCountdown(race: ActiveRace): void {
 
 function startRacing(race: ActiveRace): void {
   race.state = 'racing';
+  race.countdownRemaining = null;
   queries.updateRaceState.run('racing', race.id);
   console.log(`[race] ${race.id} → RACING`);
 
@@ -326,6 +323,7 @@ function startRacing(race: ActiveRace): void {
 
 function finishRace(race: ActiveRace): void {
   race.state = 'finished';
+  race.countdownRemaining = null;
   queries.updateRaceState.run('finished', race.id);
   if (race.standingsInterval) { clearInterval(race.standingsInterval); race.standingsInterval = null; }
   console.log(`[race] ${race.id} → FINISHED`);
@@ -602,6 +600,7 @@ function getWodCompletionCount(userId: string): number {
 
 function cancelRace(race: ActiveRace): void {
   race.state = 'canceled';
+  race.countdownRemaining = null;
   queries.updateRaceState.run('canceled', race.id);
   console.log(`[race] ${race.id} → CANCELED`);
 
